@@ -50,17 +50,6 @@ def paste_dog(dog_image, target_image, x_offset=50, y_offset=50):
     result_image = Image.fromarray(result_image_cv, "RGBA")
     return result_image
 
-def fetch_random_dog_image():
-    # Fetch a random dog image URL from the Dog CEO API
-    response = requests.get("https://dog.ceo/api/breeds/image/random")
-    data = response.json()
-    image_url = data["message"]
-    
-    response = requests.get(image_url)
-    image = Image.open(BytesIO(response.content))
-    
-    return image
-
 dog = Dog()
 api_key=""
 streetview = Streetview(api_key)

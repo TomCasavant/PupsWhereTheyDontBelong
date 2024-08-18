@@ -7,9 +7,6 @@ from io import BytesIO
 from dog import Dog
 from streetview import Streetview
 
-model = torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True)
-model.eval()
-
 def paste_dog(dog_image, target_image, x_offset=50, y_offset=50):
     dog_image_rgba = dog_image.convert("RGBA")
     target_image_rgba = target_image.convert("RGBA")
@@ -65,7 +62,7 @@ def fetch_random_dog_image():
     return image
 
 dog = Dog()
-api_key="TEMPORARY API KEY - REPLACE WITH YOUR OWN"
+api_key=""
 streetview = Streetview(api_key)
 streetview_image = streetview.generate_random_streetview_image()
 dog_image = dog.get_cutout()

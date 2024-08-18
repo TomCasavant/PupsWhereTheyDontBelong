@@ -5,6 +5,8 @@ import numpy as np
 import requests
 from PIL import Image
 from io import BytesIO
+# import the weights
+from torchvision.models.detection import MaskRCNN_ResNet50_FPN_Weights
 
 class Dog:
 
@@ -12,7 +14,7 @@ class Dog:
     model = None
 
     def __init__(self):
-        self.model = torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True)
+        self.model = torchvision.models.detection.maskrcnn_resnet50_fpn(weights=MaskRCNN_ResNet50_FPN_Weights.DEFAULT)
         self.model.eval()
 
     '''

@@ -1,65 +1,14 @@
-import torch
 import torchvision
 import cv2
 import numpy as np
 from PIL import Image
 import requests
 from io import BytesIO
+from dog import Dog
+from streetview import Streetview
 
 model = torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True)
 model.eval()
-
-def get_dog_mask(image, threshold=0.5):
-    # Ensure image is in RGB format
-    image = image.convert("RGB")
-    
-    transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor()])
-    image_tensor = transform(image).unsqueeze(0)
-
-    with torch.no_grad():
-        predictions = model(image_tensor)
-
-    masks = predictions[0]['masks']
-    labels = predictions[0]['labels']
-
-    dog_mask = None
-    for i, label in enumerate(labels):
-        if label == 18:  # 18 is the class index for "dog" in COCO dataset
-            dog_mask = masks[i, 0].mul(255).byte().cpu().numpy()
-
-            # Apply thresholding to make the mask tighter
-            _, dog_mask = cv2.threshold(dog_mask, int(threshold * 255), 255, cv2.THRESH_BINARY)
-            
-            # Apply morphological operations to refine the mask
-            kernel = np.ones((5, 5), np.uint8)
-            dog_mask = cv2.erode(dog_mask, kernel, iterations=1)
-            dog_mask = cv2.dilate(dog_mask, kernel, iterations=1)
-            
-            # Find contours and create a new mask that closely follows the dog shape
-            contours, _ = cv2.findContours(dog_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            new_mask = np.zeros_like(dog_mask)
-            cv2.drawContours(new_mask, contours, -1, 255, thickness=cv2.FILLED)
-
-            dog_mask = new_mask
-            break
-    
-    return dog_mask
-
-def extract_dog(image, dog_mask):
-    image_cv = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-    
-    # Create an alpha channel with the same size as the image
-    alpha_channel = np.ones((image_cv.shape[0], image_cv.shape[1]), dtype=np.uint8) * 255
-    
-    # Apply the mask to the alpha channel
-    alpha_channel[dog_mask == 0] = 0
-    
-    # Add the alpha channel to the image
-    bgr_image = cv2.merge((image_cv[..., 0], image_cv[..., 1], image_cv[..., 2], alpha_channel))
-    
-    # Convert to PIL Image format with transparency
-    dog_image_pil = Image.fromarray(cv2.cvtColor(bgr_image, cv2.COLOR_BGRA2RGBA))
-    return dog_image_pil
 
 def paste_dog(dog_image, target_image, x_offset=50, y_offset=50):
     dog_image_rgba = dog_image.convert("RGBA")
@@ -115,17 +64,17 @@ def fetch_random_dog_image():
     
     return image
 
-source_image = fetch_random_dog_image()
-target_image_path = "streetview.png"
-
-target_image = Image.open(target_image_path).convert("RGBA")
-
-dog_mask = get_dog_mask(source_image, threshold=0.35) 
-
-if dog_mask is not None:
-    dog_image = extract_dog(source_image, dog_mask)
-    result_image = paste_dog(dog_image, target_image)
+dog = Dog()
+api_key="TEMPORARY API KEY - REPLACE WITH YOUR OWN"
+streetview = Streetview(api_key)
+streetview_image = streetview.generate_random_streetview_image()
+dog_image = dog.get_cutout()
+if dog_image is not None:
+    result_image = paste_dog(dog_image, streetview_image.image)
     result_image.save("output_image.png")
     result_image.show()
+    print(f"Street View image saved to: {streetview_image.image_path}")
+    print(f"Country: {streetview_image.country}")
+    print(f"Latitude: {streetview_image.lat}, Longitude: {streetview_image.lon}")
 else:
     print("No dog detected in the source image.")

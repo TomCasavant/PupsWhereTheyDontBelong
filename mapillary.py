@@ -4,14 +4,14 @@ from PIL import Image
 from io import BytesIO
 import time
 
-'''
+"""
     Performs a reverse geocoding lookup using OpenStreetMap Nominatim API
-'''
+"""
+
+
 def reverse_geocode(lat, lon):
     url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}"
-    headers = {
-        'User-Agent': 'PupsWhereTheyDontBelong/1.0 (your.email@example.com)'
-    }
+    headers = {"User-Agent": "PupsWhereTheyDontBelong/1.0 (your.email@example.com)"}
 
     for attempt in range(2):
         try:
@@ -19,15 +19,15 @@ def reverse_geocode(lat, lon):
 
             if response.status_code == 200:
                 data = response.json()
-                address = data.get('address', {})
+                address = data.get("address", {})
                 components = [
-                    address.get('city', address.get('town', '')),
-                    address.get('state', ''),
-                    address.get('country', '')
+                    address.get("city", address.get("town", "")),
+                    address.get("state", ""),
+                    address.get("country", ""),
                 ]
 
                 # Remove empty components and join with commas
-                location_name = ', '.join(filter(None, components))
+                location_name = ", ".join(filter(None, components))
                 return location_name if location_name else None
 
         except requests.RequestException:
@@ -36,6 +36,7 @@ def reverse_geocode(lat, lon):
 
     # Both attempts failed - return None
     return None
+
 
 class MapillaryImage:
     def __init__(self, image, image_path, image_url, lat, lon, creator):
@@ -55,7 +56,6 @@ class MapillaryImage:
         return reverse_geocode(self.lat, self.lon)
 
 
-
 class Mapillary:
     API_KEY: str = None
     OUTPUT_DIR: str = "images"
@@ -64,11 +64,12 @@ class Mapillary:
     def __init__(self, api_key):
         self.API_KEY = api_key
 
-    '''
+    """
     Find the latest image in the output directory
-    '''
+    """
+
     def find_latest_image(self):
-        #TODO: Probably not necessary anymore since we're not using streetview
+        # TODO: Probably not necessary anymore since we're not using streetview
         image_files = []
         for root, dirs, files in os.walk(self.OUTPUT_DIR):
             for file in files:
@@ -80,31 +81,32 @@ class Mapillary:
 
         return None  # No image files found
 
-    '''
+    """
     Fetch a random image from the Mapillary API and downloads it
-    '''
+    """
+
     def fetch_random_image_from_mapillary(self):
-        headers = {
-            'Authorization': f'Bearer {self.API_KEY}'
-        }
+        headers = {"Authorization": f"Bearer {self.API_KEY}"}
 
         params = {
-            'fields': 'id,computed_geometry,creator.username,thumb_1024_url',
-            'limit': 1,
-            'bbox': '[-180,-90,180,90]'  # Bounding box covering the entire globe
+            "fields": "id,computed_geometry,creator.username,thumb_1024_url",
+            "limit": 1,
+            "bbox": "[-180,-90,180,90]",  # Bounding box covering the entire globe
         }
 
-        response = requests.get(self.MAPILLARY_IMAGE_ENDPOINT, headers=headers, params=params)
+        response = requests.get(
+            self.MAPILLARY_IMAGE_ENDPOINT, headers=headers, params=params
+        )
         if response.status_code == 200:
             data = response.json()
-            if data.get('data'):
-                image_data = data['data'][0]
+            if data.get("data"):
+                image_data = data["data"][0]
 
-                image_id = image_data['id']
-                lon, lat = image_data['computed_geometry']['coordinates']
+                image_id = image_data["id"]
+                lon, lat = image_data["computed_geometry"]["coordinates"]
 
                 # Download the image
-                image_url = image_data['thumb_1024_url']
+                image_url = image_data["thumb_1024_url"]
                 image_response = requests.get(image_url)
 
                 if image_response.status_code == 200:
@@ -117,8 +119,10 @@ class Mapillary:
                     image.save(image_path)
 
                     # Extract attribution details
-                    creator = image_data['creator']['username']
+                    creator = image_data["creator"]["username"]
 
-                    return MapillaryImage(image, image_path, image_url, lat, lon, creator)
+                    return MapillaryImage(
+                        image, image_path, image_url, lat, lon, creator
+                    )
 
         return None  # No images found

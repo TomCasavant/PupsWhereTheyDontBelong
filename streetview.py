@@ -2,40 +2,56 @@ import os
 import requests
 from PIL import Image
 from io import BytesIO
-
+import time
 
 def reverse_geocode(lat, lon):
     url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}"
     headers = {
-        'User-Agent': 'YourAppName/1.0 (your.email@example.com)'
+        'User-Agent': 'PupsWhereTheyDontBelong/1.0 (your.email@example.com)'
     }
-    response = requests.get(url, headers=headers)
 
-    if response.status_code == 200:
-        data = response.json()
-        print(data)
-        address = data.get('address', {})
-        components = [
-            #address.get('road', ''),
-            address.get('city', address.get('town', '')),
-            address.get('state', ''),
-            address.get('country', '')
-        ]
+    # Try up to two times to get a successful response
+    for attempt in range(2):
+        try:
+            response = requests.get(url, headers=headers)
 
-        # Remove empty components and join with comma
-        location_name = ', '.join(filter(None, components))
-        return location_name
+            if response.status_code == 200:
+                data = response.json()
+                address = data.get('address', {})
+                components = [
+                    address.get('city', address.get('town', '')),
+                    address.get('state', ''),
+                    address.get('country', '')
+                ]
 
-    return "Unknown Location"
+                # Remove empty components and join with commas
+                location_name = ', '.join(filter(None, components))
+                return location_name if location_name else None
+
+        except requests.RequestException:
+            time.sleep(3)  # Wait for 3 seconds before retrying
+            pass
+
+    # If both attempts fail or return empty data
+    return None
 
 class StreetviewImage:
-    def __init__(self, image, image_path, country, lat, lon, attribution):
+    def __init__(self, image, image_path, image_url, lat, lon, creator):
         self.image = image
         self.image_path = image_path
-        self.country = country
         self.lat = lat
         self.lon = lon
-        self.attribution = attribution
+        self.creator = creator
+        self.image_url = image_url
+
+    @property
+    def attribution(self):
+        return f"<a href='{self.image_url}'>Photo</a> by <a href='https://www.mapillary.com/app/user/{self.creator}'>{self.creator}</a>"
+
+    @property
+    def location(self):
+        return reverse_geocode(self.lat, self.lon)
+
 
 
 class Streetview:
@@ -92,11 +108,10 @@ class Streetview:
                     image.save(image_path)
 
                     # Extract attribution details
-                    author = image_data['creator'].get('username', 'Unknown')
-                    attribution = f"Author: {author}"
+                    creator = image_data['creator']['username']
+                    # Attribution = <a href='image link'>Image Title</a> by <a href='author profile'>Author</a>
 
-                    country_name = reverse_geocode(lat, lon)
 
-                    return StreetviewImage(image, image_path, country_name, lat, lon, attribution)
+                    return StreetviewImage(image, image_path, image_url, lat, lon, creator)
 
         return None  # No images found

@@ -12,6 +12,7 @@ class Dog:
 
     API_URL: str = "https://dog.ceo/api/breeds/image/random"
     model = None
+    image_url = None
 
     def __init__(self):
         self.model = torchvision.models.detection.maskrcnn_resnet50_fpn(weights=MaskRCNN_ResNet50_FPN_Weights.DEFAULT)
@@ -24,12 +25,16 @@ class Dog:
         # Fetch a random dog image URL from the Dog CEO API
         response = requests.get(self.API_URL)
         data = response.json()
-        image_url = data["message"]
+        self.image_url = data["message"]
 
-        response = requests.get(image_url)
+        response = requests.get(self.image_url)
         image = Image.open(BytesIO(response.content))
 
         return image
+
+    @property
+    def attribution(self):
+        return f"<a href='{self.image_url}'>Dog Source</a>"
 
     '''
     Get the mask of the dog in the image
@@ -110,3 +115,48 @@ class Dog:
         dog_cutout = self.extract_dog(image, dog_mask)
 
         return dog_cutout
+
+    '''
+        Copies the dog cutout to the new image
+    '''
+    def paste_to_image(self, dog_image, target_image, x_offset=50, y_offset=50):
+        dog_image_rgba = dog_image.convert("RGBA")
+        target_image_rgba = target_image.convert("RGBA")
+
+        dog_image_cv = np.array(dog_image_rgba)
+        target_image_cv = np.array(target_image_rgba)
+
+        h, w, _ = dog_image_cv.shape
+        target_h, target_w, _ = target_image_cv.shape
+
+        if x_offset + w > target_w or y_offset + h > target_h:
+            max_width = target_w - x_offset
+            max_height = target_h - y_offset
+            scaling_factor = min(max_width / w, max_height / h)
+
+            new_w = int(w * scaling_factor)
+            new_h = int(h * scaling_factor)
+            dog_image_cv = cv2.resize(dog_image_cv, (new_w, new_h), interpolation=cv2.INTER_AREA)
+
+            # Update dimensions after resizing
+            h, w, _ = dog_image_cv.shape
+
+        # Create an empty RGBA image for pasting
+        result_image_cv = target_image_cv.copy()
+
+        # Create a mask from the alpha channel of the dog image
+        mask = dog_image_cv[..., 3]
+        mask = cv2.merge((mask, mask, mask))  # Convert mask to 3 channels
+
+        # Paste the dog image onto the target image
+        for c in range(3):  # For each color channel
+            result_image_cv[y_offset:y_offset + h, x_offset:x_offset + w, c] = \
+                (dog_image_cv[..., 3] / 255.0 * dog_image_cv[..., c] +
+                 (1 - dog_image_cv[..., 3] / 255.0) * target_image_cv[y_offset:y_offset + h, x_offset:x_offset + w, c])
+
+        # Apply the alpha channel to the result image
+        alpha_channel = np.maximum(mask[..., 0], result_image_cv[y_offset:y_offset + h, x_offset:x_offset + w, 3])
+        result_image_cv[y_offset:y_offset + h, x_offset:x_offset + w, 3] = alpha_channel
+
+        result_image = Image.fromarray(result_image_cv, "RGBA")
+        return result_image

@@ -10,7 +10,6 @@ def reverse_geocode(lat, lon):
         'User-Agent': 'PupsWhereTheyDontBelong/1.0 (your.email@example.com)'
     }
 
-    # Try up to two times to get a successful response
     for attempt in range(2):
         try:
             response = requests.get(url, headers=headers)
@@ -32,10 +31,10 @@ def reverse_geocode(lat, lon):
             time.sleep(3)  # Wait for 3 seconds before retrying
             pass
 
-    # If both attempts fail or return empty data
+    # Both attempts failed - return None
     return None
 
-class StreetviewImage:
+class MapillaryImage:
     def __init__(self, image, image_path, image_url, lat, lon, creator):
         self.image = image
         self.image_path = image_path
@@ -54,7 +53,7 @@ class StreetviewImage:
 
 
 
-class Streetview:
+class Mapillary:
     API_KEY: str = None
     OUTPUT_DIR: str = "images"
     MAPILLARY_IMAGE_ENDPOINT: str = "https://graph.mapillary.com/images"
@@ -112,6 +111,6 @@ class Streetview:
                     # Attribution = <a href='image link'>Image Title</a> by <a href='author profile'>Author</a>
 
 
-                    return StreetviewImage(image, image_path, image_url, lat, lon, creator)
+                    return MapillaryImage(image, image_path, image_url, lat, lon, creator)
 
         return None  # No images found

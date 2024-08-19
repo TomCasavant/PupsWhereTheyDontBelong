@@ -1,0 +1,9 @@
+Where has {name} gone?
+Great, now we've lost {name}.
+{name} is on the move again.
+{name} is off on another adventure.
+{name} is exploring new places.
+{name} is traveling the world.
+Look where {name} is now!
+{name} is on the go.
+{name} is on the move.

@@ -11,8 +11,9 @@ from torchvision.models.detection import MaskRCNN_ResNet50_FPN_Weights
 class Dog:
 
     API_URL: str = "https://dog.ceo/api/breeds/image/random"
+    DOG_INDEX: int = 18 # 18 is the class index for "dog" in COCO dataset
     model = None
-    image_url = None
+    image_url: str = None
 
     def __init__(self):
         self.model = torchvision.models.detection.maskrcnn_resnet50_fpn(weights=MaskRCNN_ResNet50_FPN_Weights.DEFAULT)
@@ -53,13 +54,12 @@ class Dog:
 
         dog_mask = None
         for i, label in enumerate(labels):
-            if label == 18:  # 18 is the class index for "dog" in COCO dataset
+            if label == self.DOG_INDEX:
                 dog_mask = masks[i, 0].mul(255).byte().cpu().numpy()
 
                 # Apply thresholding to make the mask tighter
                 _, dog_mask = cv2.threshold(dog_mask, int(threshold * 255), 255, cv2.THRESH_BINARY)
 
-                # Apply morphological operations to refine the mask
                 kernel = np.ones((5, 5), np.uint8)
                 dog_mask = cv2.erode(dog_mask, kernel, iterations=1)
                 dog_mask = cv2.dilate(dog_mask, kernel, iterations=1)
@@ -120,43 +120,22 @@ class Dog:
         Copies the dog cutout to the new image
     '''
     def paste_to_image(self, dog_image, target_image, x_offset=50, y_offset=50):
-        dog_image_rgba = dog_image.convert("RGBA")
-        target_image_rgba = target_image.convert("RGBA")
+        # Ensure images have alpha channels
+        dog_image = dog_image.convert("RGBA")
+        target_image = target_image.convert("RGBA")
 
-        dog_image_cv = np.array(dog_image_rgba)
-        target_image_cv = np.array(target_image_rgba)
+        # Resize the dog image if necessary (sometimes the dog.ceo image is very large)
+        target_width, target_height = target_image.size
+        dog_width, dog_height = dog_image.size
 
-        h, w, _ = dog_image_cv.shape
-        target_h, target_w, _ = target_image_cv.shape
+        if x_offset + dog_width > target_width or y_offset + dog_height > target_height:
+            max_width = target_width - x_offset
+            max_height = target_height - y_offset
+            scaling_factor = min(max_width / dog_width, max_height / dog_height)
+            new_size = (int(dog_width * scaling_factor), int(dog_height * scaling_factor))
+            dog_image = dog_image.resize(new_size, Image.Resampling.LANCZOS)  # Updated here
 
-        if x_offset + w > target_w or y_offset + h > target_h:
-            max_width = target_w - x_offset
-            max_height = target_h - y_offset
-            scaling_factor = min(max_width / w, max_height / h)
+        # Paste the dog image onto the target image with transparency
+        target_image.paste(dog_image, (x_offset, y_offset), dog_image)
 
-            new_w = int(w * scaling_factor)
-            new_h = int(h * scaling_factor)
-            dog_image_cv = cv2.resize(dog_image_cv, (new_w, new_h), interpolation=cv2.INTER_AREA)
-
-            # Update dimensions after resizing
-            h, w, _ = dog_image_cv.shape
-
-        # Create an empty RGBA image for pasting
-        result_image_cv = target_image_cv.copy()
-
-        # Create a mask from the alpha channel of the dog image
-        mask = dog_image_cv[..., 3]
-        mask = cv2.merge((mask, mask, mask))  # Convert mask to 3 channels
-
-        # Paste the dog image onto the target image
-        for c in range(3):  # For each color channel
-            result_image_cv[y_offset:y_offset + h, x_offset:x_offset + w, c] = \
-                (dog_image_cv[..., 3] / 255.0 * dog_image_cv[..., c] +
-                 (1 - dog_image_cv[..., 3] / 255.0) * target_image_cv[y_offset:y_offset + h, x_offset:x_offset + w, c])
-
-        # Apply the alpha channel to the result image
-        alpha_channel = np.maximum(mask[..., 0], result_image_cv[y_offset:y_offset + h, x_offset:x_offset + w, 3])
-        result_image_cv[y_offset:y_offset + h, x_offset:x_offset + w, 3] = alpha_channel
-
-        result_image = Image.fromarray(result_image_cv, "RGBA")
-        return result_image
+        return target_image

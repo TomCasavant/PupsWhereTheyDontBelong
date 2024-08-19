@@ -4,6 +4,9 @@ from PIL import Image
 from io import BytesIO
 import time
 
+'''
+    Performs a reverse geocoding lookup using OpenStreetMap Nominatim API
+'''
 def reverse_geocode(lat, lon):
     url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}"
     headers = {
@@ -61,7 +64,11 @@ class Mapillary:
     def __init__(self, api_key):
         self.API_KEY = api_key
 
+    '''
+    Find the latest image in the output directory
+    '''
     def find_latest_image(self):
+        #TODO: Probably not necessary anymore since we're not using streetview
         image_files = []
         for root, dirs, files in os.walk(self.OUTPUT_DIR):
             for file in files:
@@ -73,6 +80,9 @@ class Mapillary:
 
         return None  # No image files found
 
+    '''
+    Fetch a random image from the Mapillary API and downloads it
+    '''
     def fetch_random_image_from_mapillary(self):
         headers = {
             'Authorization': f'Bearer {self.API_KEY}'
@@ -108,8 +118,6 @@ class Mapillary:
 
                     # Extract attribution details
                     creator = image_data['creator']['username']
-                    # Attribution = <a href='image link'>Image Title</a> by <a href='author profile'>Author</a>
-
 
                     return MapillaryImage(image, image_path, image_url, lat, lon, creator)
 

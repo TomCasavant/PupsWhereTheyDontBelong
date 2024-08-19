@@ -15,6 +15,9 @@ class DogMapillaryPost:
         self.mapillary = Mapillary(self.config["Mapillary"]["api_key"])
         self.subclub = Subclub(self.config["Subclub"]["api_key"])
 
+    '''
+        Combines a random first name and last name to create Dog's new name
+    '''
     def generate_name(self):
         with open("assets/firstnames.txt") as f:
             firstnames = f.read().splitlines()
@@ -23,6 +26,9 @@ class DogMapillaryPost:
         name = f"{np.random.choice(firstnames)} {np.random.choice(secondnames)}"
         return name
 
+    '''
+        Generates a phrase from the phrases.txt file, fills in {country} and {name} placeholders
+    '''
     def generate_phrase(self, name, location):
         phrase_file = "assets/phrases.txt"
         if not location:
@@ -35,6 +41,9 @@ class DogMapillaryPost:
         phrase = phrase.replace("{country}", location)
         return phrase
 
+    '''
+        Create the post content with the generated phrase and attribution
+    '''
     def create_post_content(self, phrase, mapillary_image):
         if mapillary_image.location:
             osm_url = f"http://www.openstreetmap.org/?mlat={mapillary_image.lat}&mlon={mapillary_image.lon}&zoom=12"

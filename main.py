@@ -6,6 +6,8 @@ import requests
 from io import BytesIO
 from dog import Dog
 from streetview import Streetview
+from subclub import Subclub
+import toml
 
 def paste_dog(dog_image, target_image, x_offset=50, y_offset=50):
     dog_image_rgba = dog_image.convert("RGBA")
@@ -51,16 +53,40 @@ def paste_dog(dog_image, target_image, x_offset=50, y_offset=50):
     return result_image
 
 dog = Dog()
-api_key=""
+config = toml.load("config.toml")
+
+api_key = config["Streetview"]["api_key"]
 streetview = Streetview(api_key)
-streetview_image = streetview.generate_random_streetview_image()
+streetview_image = streetview.fetch_random_image_from_mapillary()
 dog_image = dog.get_cutout()
+
+subclub = Subclub(config["Subclub"]["api_key"])
+
 if dog_image is not None:
     result_image = paste_dog(dog_image, streetview_image.image)
     result_image.save("output_image.png")
     result_image.show()
+
+    with open("firstnames.txt") as f:
+        firstnames = f.read().splitlines()
+    with open("secondnames.txt") as f:
+        secondnames = f.read().splitlines()
+
+    name = f"{np.random.choice(firstnames)} {np.random.choice(secondnames)}"
+
+    print(f"Generated Name: {name}")
     print(f"Street View image saved to: {streetview_image.image_path}")
     print(f"Country: {streetview_image.country}")
     print(f"Latitude: {streetview_image.lat}, Longitude: {streetview_image.lon}")
+    # http://www.openstreetmap.org/?mlat=latitude&mlon=longitude&zoom=12
+    print(f"OpenStreetMap URL: http://www.openstreetmap.org/?mlat={streetview_image.lat}&mlon={streetview_image.lon}&zoom=12")
+
+    with open("phrases.txt") as f:
+        phrases = f.read().splitlines()
+    phrase = np.random.choice(phrases)
+    # Phrases look like What is {name} doing in {country}?
+    phrase = phrase.replace("{name}", name)
+    phrase = phrase.replace("{country}", streetview_image.country)
+    print(f"Generated Phrase: {phrase}")
 else:
     print("No dog detected in the source image.")

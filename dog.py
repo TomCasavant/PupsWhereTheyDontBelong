@@ -46,82 +46,44 @@ class Dog:
         """Provide the attribution for the dog image source."""
         return f"<a href='{self.image_url}'>Dog Source</a>"
 
-    def get_dog_mask(self, image, threshold=0.5) -> np.ndarray:
+    def get_dog_mask(self, image: Image, threshold=0.5) -> np.ndarray:
         """
         Generate a mask for the dog in the provided image.
 
         Args:
-            image (Image): The input image containing a dog.
+            image (Image): The image containing the dog.
             threshold (float): The threshold for the mask.
-
-        Returns:
-            np.ndarray: A binary mask where the dog is represented by white pixels.
         """
-        image = image.convert("RGB")
-
-        transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor()])
+        # Convert image to tensor
+        transform = torchvision.transforms.ToTensor()
         image_tensor = transform(image).unsqueeze(0)
 
+        # Get model predictions
         with torch.no_grad():
             predictions = self.model(image_tensor)
 
-        masks = predictions[0]["masks"]
-        labels = predictions[0]["labels"]
+        # Filter for dog label and create mask
+        for i, label in enumerate(predictions[0]["labels"]):
+            if label.item() == self.DOG_INDEX:
+                mask = predictions[0]["masks"][i, 0].cpu().numpy()
+                binary_mask = (mask > threshold).astype(np.uint8) * 255
+                return binary_mask
 
-        dog_mask = None
-        for i, label in enumerate(labels):
-            if label == self.DOG_INDEX:
-                dog_mask = masks[i, 0].mul(255).byte().cpu().numpy()
+        return None
 
-                # Apply thresholding to make the mask tighter
-                _, dog_mask = cv2.threshold(
-                    dog_mask, int(threshold * 255), 255, cv2.THRESH_BINARY
-                )
-
-                kernel = np.ones((5, 5), np.uint8)
-                dog_mask = cv2.erode(dog_mask, kernel, iterations=1)
-                dog_mask = cv2.dilate(dog_mask, kernel, iterations=1)
-
-                # Find contours and create a new mask that closely follows the dog shape
-                contours, _ = cv2.findContours(
-                    dog_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
-                )
-                new_mask = np.zeros_like(dog_mask)
-                cv2.drawContours(new_mask, contours, -1, 255, thickness=cv2.FILLED)
-
-                dog_mask = new_mask
-                break
-
-        return dog_mask
-
-    def extract_dog(self, image, dog_mask) -> Image:
+    def extract_dog(self, image: Image, dog_mask: np.ndarray) -> Image:
         """
         Extract the dog from the image using the provided mask.
 
         Args:
-            image (Image): The input image containing a dog.
-            dog_mask (np.ndarray): The mask of the dog.
-
-        Returns:
-            Image: A PIL Image object of the extracted dog with transparency.
+            image (Image): The original image.
+            dog_mask (np.ndarray): The mask for the dog.
         """
-        image_cv = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+        image_np = np.array(image)
+        alpha_channel = np.where(dog_mask > 0, 255, 0).astype(np.uint8)
+        image_with_alpha = np.dstack((image_np, alpha_channel))
 
-        # Create an alpha channel with the same size as the image
-        alpha_channel = (
-            np.ones((image_cv.shape[0], image_cv.shape[1]), dtype=np.uint8) * 255
-        )
-
-        # Apply the mask to the alpha channel
-        alpha_channel[dog_mask == 0] = 0
-
-        # Add the alpha channel to the image
-        bgr_image = cv2.merge(
-            (image_cv[..., 0], image_cv[..., 1], image_cv[..., 2], alpha_channel)
-        )
-
-        # Convert to PIL Image format with transparency
-        dog_image_pil = Image.fromarray(cv2.cvtColor(bgr_image, cv2.COLOR_BGRA2RGBA))
+        dog_image_pil = Image.fromarray(image_with_alpha)
         return dog_image_pil
 
     def get_cutout(self) -> Image:

@@ -5,12 +5,13 @@ import numpy as np
 import requests
 from PIL import Image
 from io import BytesIO
-
-# import the weights
 from torchvision.models.detection import MaskRCNN_ResNet50_FPN_Weights
 
 
 class Dog:
+    """
+    A class for working with dog images.
+    """
 
     API_URL: str = "https://dog.ceo/api/breeds/image/random"
     DOG_INDEX: int = 18  # 18 is the class index for "dog" in COCO dataset
@@ -18,35 +19,44 @@ class Dog:
     image_url: str = None
 
     def __init__(self):
+        """Initialize the Dog class, download model."""
         self.model = torchvision.models.detection.maskrcnn_resnet50_fpn(
             weights=MaskRCNN_ResNet50_FPN_Weights.DEFAULT
         )
         self.model.eval()
 
-    """
-    Fetch a random dog image from the Dog CEO API
-    """
-
     def fetch_random_dog_image(self) -> Image:
-        # Fetch a random dog image URL from the Dog CEO API
-        response = requests.get(self.API_URL)
+        """
+        Fetch a random dog image from the Dog CEO API.
+
+        Returns:
+            Image: AnImage object of the fetched dog.
+        """
+        response = requests.get(self.API_URL, timeout=10)  # Added timeout here
         data = response.json()
         self.image_url = data["message"]
 
-        response = requests.get(self.image_url)
+        response = requests.get(self.image_url, timeout=10)  # Added timeout here
         image = Image.open(BytesIO(response.content))
 
         return image
 
     @property
     def attribution(self):
+        """Provide the attribution for the dog image source."""
         return f"<a href='{self.image_url}'>Dog Source</a>"
 
-    """
-    Get the mask of the dog in the image
-    """
-
     def get_dog_mask(self, image, threshold=0.5) -> np.ndarray:
+        """
+        Generate a mask for the dog in the provided image.
+
+        Args:
+            image (Image): The input image containing a dog.
+            threshold (float): The threshold for the mask.
+
+        Returns:
+            np.ndarray: A binary mask where the dog is represented by white pixels.
+        """
         image = image.convert("RGB")
 
         transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor()])
@@ -84,11 +94,17 @@ class Dog:
 
         return dog_mask
 
-    """
-    Extract the dog from the image using the mask
-    """
-
     def extract_dog(self, image, dog_mask) -> Image:
+        """
+        Extract the dog from the image using the provided mask.
+
+        Args:
+            image (Image): The input image containing a dog.
+            dog_mask (np.ndarray): The mask of the dog.
+
+        Returns:
+            Image: A PIL Image object of the extracted dog with transparency.
+        """
         image_cv = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
 
         # Create an alpha channel with the same size as the image
@@ -108,40 +124,45 @@ class Dog:
         dog_image_pil = Image.fromarray(cv2.cvtColor(bgr_image, cv2.COLOR_BGRA2RGBA))
         return dog_image_pil
 
-    """
-    Get a cutout of a dog image
-    """
-
     def get_cutout(self) -> Image:
-        # Fetch a random dog image
+        """
+        Get a cutout of the dog from a random image.
+
+        Returns:
+            Image: An Image object of the dog cutout with transparency, or None if failed.
+        """
         image = self.fetch_random_dog_image()
 
         if image is None:
-            # Image fetch failed
             return None
 
-        # Get the dog mask
         dog_mask = self.get_dog_mask(image)
 
         if dog_mask is None:
-            # Dog could not be found in image
             return None
 
-        # Extract the dog from the image using the mask
         dog_cutout = self.extract_dog(image, dog_mask)
 
         return dog_cutout
 
-    """
-        Copies the dog cutout to the new image
-    """
-
     def paste_to_image(self, dog_image, target_image, x_offset=50, y_offset=50):
-        # Ensure images have alpha channels
+        """
+        Paste the dog cutout onto a target image.
+
+        Args:
+            dog_image (Image): The dog cutout image.
+            target_image (Image): The image to paste the dog onto.
+            x_offset (int): The x-coordinate of the top-left corner to start pasting.
+            y_offset (int): The y-coordinate of the top-left corner to start pasting.
+
+        Returns:
+            Image: The target image with the dog cutout pasted onto it.
+        """
+        #TODO: Experiment with offset values to more randomly place the dog
         dog_image = dog_image.convert("RGBA")
         target_image = target_image.convert("RGBA")
 
-        # Resize the dog image if necessary (sometimes the dog.ceo image is very large)
+        # Resize the dog image if necessary
         target_width, target_height = target_image.size
         dog_width, dog_height = dog_image.size
 
@@ -153,9 +174,7 @@ class Dog:
                 int(dog_width * scaling_factor),
                 int(dog_height * scaling_factor),
             )
-            dog_image = dog_image.resize(
-                new_size, Image.Resampling.LANCZOS
-            )  # Updated here
+            dog_image = dog_image.resize(new_size, Image.Resampling.LANCZOS)
 
         # Paste the dog image onto the target image with transparency
         target_image.paste(dog_image, (x_offset, y_offset), dog_image)

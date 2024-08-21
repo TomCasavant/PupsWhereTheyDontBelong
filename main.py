@@ -39,7 +39,9 @@ class DogMapillaryPost:
                 firstnames = f.read().splitlines()
             with open("assets/secondnames.txt") as f:
                 secondnames = f.read().splitlines()
+                
             name = f"{np.random.choice(firstnames)} {np.random.choice(secondnames)}"
+            
             return name
         except FileNotFoundError as e:
             print(f"Error: {e}")
@@ -99,7 +101,8 @@ class DogMapillaryPost:
 
         if dog_image is not None:
             result_image = self.dog.paste_to_image(dog_image, mapillary_image.image)
-            result_image.save("output_image.png")
+            image_path = "output_image.png"
+            result_image.save(image_path)
             result_image.show()
 
             name = self.generate_name()
@@ -112,12 +115,18 @@ class DogMapillaryPost:
             print(f"Generated Phrase: {phrase}")
 
             post_content = self.create_post_content(phrase, mapillary_image)
-            response = self.subclub.post(post_content)
+            media_upload = self.subclub.upload_media(image_path)
+            if media_upload:
+                media_id = media_upload.get('id')
+                print(f"Media ID: {media_id}")
+                response = self.subclub.post(post_content, media_ids=[media_id])
+            else:
+                print("Failed to upload media")
         else:
             print("No dog detected in the source image.")
 
 
 if __name__ == "__main__":
-    dog_street_view_post = DogMapillaryPost()
-    dog_street_view_post.run()
+    dog_mapillary_post = DogMapillaryPost()
+    dog_mapillary_post.run()
 
